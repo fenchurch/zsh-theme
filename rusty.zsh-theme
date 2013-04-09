@@ -17,8 +17,8 @@ RESET=$reset_color
 #git
 ZSH_THEME_GIT_PROMPT_PREFIX="%{$RESET%}[git:"
 ZSH_THEME_GIT_PROMPT_SUFFIX="]"
-ZSH_THEME_GIT_PROMPT_DIRTY="$R▼ "
-ZSH_THEME_GIT_PROMPT_CLEAN="$G▲ "
+ZSH_THEME_GIT_PROMPT_DIRTY="%{$R%}▼ "
+ZSH_THEME_GIT_PROMPT_CLEAN="%{$G%}▲ "
 
 function user_prompt_info {
     #if you're on a different user than yours
@@ -50,7 +50,7 @@ function length {
 function column {
     local max=${3:-$(tput cols)}
     #(l:int::str:)
-    echo -n "${(l:$(( $max - $(length $1) - $(length $2) ))::-:)}"
+    echo "${(l:$(( $max - $(length $1) - $(length $2) ))::-:)}"
 }
 function shorten {
     #arg 3 or term width
@@ -72,7 +72,7 @@ function build_prompt() {
     local user="$(user_prompt_info)"
     local ssh="$(ssh_prompt_info)"    
     local git="$(git_prompt_info)"
-    [ $UID ] && prompt_color=$W || prompt_color=$Y
+    [ ! -z $UID ] && prompt_color=$W || prompt_color=$Y
 
     l="%B$dir%b $git"
     r=" $ssh$time"
