@@ -33,9 +33,7 @@ function user_prompt_info {
 }
 
 function ssh_prompt_info {
-    if [[ $SSH_CLIENT != "" ]]; then
-        echo -n "${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1)${2:-"]"}"
-    fi
+    [ "$SSH_CLIENT" != "" ] && echo -n "${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1)${2:-"]"}";
 }
 
 function git_prompt_info {
@@ -48,8 +46,6 @@ function length {
     #find string length unformatted
     echo ${#:-${(S%%)1//$~cl}}
 }
-
-
 
 function column {
     local max=${3:-$(tput cols)}
@@ -72,25 +68,14 @@ function shorten {
 function build_prompt() {
     local dir="${(%):-%~}"
     local host="${:-$(hostname)%%.*}"
+    local time="${(%):-%*}"    
     local user="$(user_prompt_info)"
     local ssh="$(ssh_prompt_info)"    
-
-    local prompt_color=$W
-    
-    if [[ $UID -eq 0 ]]; then
-        prompt_color=$Y
-    fi
-
-    local time="${(%):-%*}"
-
-    if [[ $SSH_CLIENT != "" ]]; then
-        ssh="$(echo "$SSH_CLIENT" | cut -f 1)"
-    fi
-
     local git="$(git_prompt_info)"
+    [ $UID ] && prompt_color=$W || prompt_color=$Y
 
     l="%B$dir%b $git"
-    r=" $ssh$time :"
+    r=" $ssh$time"
     c="$(column "$l" "$r")"
 
     echo -e "$R%(?..-> %? <-\n)$RESET\n$C$l$K$c$r$RESET$prompt_color\n> "
