@@ -15,17 +15,26 @@ BB=$fg_bold[blue]
 RESET=$reset_color
 
 #git
-ZSH_THEME_GIT_PROMPT_PREFIX="[git:"
-ZSH_THEME_GIT_PROMPT_SUFFIX="]%{$RESET%}"
-ZSH_THEME_GIT_PROMPT_DIRTY="%{$R%}+"
-ZSH_THEME_GIT_PROMPT_CLEAN="%{$G%}-"
+ZSH_THEME_GIT_PROMPT_PREFIX="%{$RESET%}[git:"
+ZSH_THEME_GIT_PROMPT_SUFFIX="]"
+ZSH_THEME_GIT_PROMPT_DIRTY="$R▼ "
+ZSH_THEME_GIT_PROMPT_CLEAN="$G▲ "
 
-
+function user_prompt_info {
+    #if you're on a different user than yours
+    if [[ $USERNAME != $LOGNAME || $UID = 0 ]]; then
+        user="${(%):-"%n:"}"
+        #if you're on the root, make it yellow
+        if [[ $UID = 0 ]]; then 
+            user="$Y$user"
+        fi
+    fi
+    echo -n "$user"
+}
 
 function ssh_prompt_info {
-    local wrap=( [ ] )
-    if [ $SSH_CLIENT != "" ]; then
-        echo -n "${wrap[1]}$(echo "$SSH_CLIENT" | cut -f 1)${wrap[2]}"
+    if [[ $SSH_CLIENT != "" ]]; then
+        echo -n "${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1)${2:-"]"}"
     fi
 }
 
@@ -34,74 +43,46 @@ function git_prompt_info {
    echo "$(parse_git_dirty)$ZSH_THEME_GIT_PROMPT_PREFIX$(current_branch)$ZSH_THEME_GIT_PROMPT_SUFFIX "
 }
 function length {
+    #clear the formatting
     local cl='%([BSUbfksu]|([FB]|){*})'
+    #find string length unformatted
     echo ${#:-${(S%%)1//$~cl}}
 }
-#
+
+
+
 function column {
     local max=${3:-$(tput cols)}
-    echo "${(l:$(( $max - $(length $1) - $(length $2) ))::-:)}"
+    #(l:int::str:)
+    echo -n "${(l:$(( $max - $(length $1) - $(length $2) ))::-:)}"
 }
-
 function shorten {
+    #arg 3 or term width
     local max=${3:-$(tput cols)}
+    #arg 2 or nothing
     local offset=$(length ${2:-""})
+    #what to shorten with
     local fill=${4:-".."}
-    local filtered="%$(( $max - $offset - ${#fill} ))<""<"$1"%<<"
-    local start=${#:-${1%%"$filtered"}}
-    echo ${1%$start}
-}
-function memory {
-    TotalBytes=0
-    for Bytes in $(ls -l | grep "^-" | awk '{ print $5 }')
-    do
-        let TotalBytes=$TotalBytes+$Bytes
-    done
-    TotalMeg=$(echo -e "scale=3 \n$TotalBytes/1048576 \nquit" | bc)
-    echo -n "$TotalMeg"
-}
-function exit_code_message() {
-    #http://tldp.org/LDP/abs/html/exitcodes.html
-    local code=$?
-    local r=
-    if [ $code -gt 0 ]
-        then
-        if [[ $code -eq 1 ]]
-            then 
-            r="General Error"
-        elif [[ $code -eq 2 ]]; then
-            r="Builtin Error (Missing Keyword or Command)"
-        elif [[ $code -eq 126 ]]; then
-            r="Command invoked cannot execute (Permissions or not executable)"
-        #elif [[ $code -eq 127 ]]; then
-        #    r="Command not found"
-        elif [[ $code -eq 128 ]]; then
-            r="Invalid argument to exit (out of exit code range 0-255)"
-        elif [[ $code -gt 128 ]]; then
-            let "code =( $code > 255) ? $code % 256"
-            r="Fatal error signal "$(( $code - 128 ))
-        fi
-        if [ $r ]; then echo "$r"; fi
-    fi
-}
-function error {
+    #filter it %max<placeholder<original%<<
+    local filtered="%$(( $max - $offset - ${#fill} ))<"$fill"<"$1"%<<"
+    #local start=${#:-${1%%"$filtered"}}
+    #echo ${1%$start}
+    echo -n "$filtered"
 }
 function build_prompt() {
     local dir="${(%):-%~}"
-    local host=
-    local user=
+    local host="${:-$(hostname)%%.*}"
+    local user="$(user_prompt_info)"
+    local ssh="$(ssh_prompt_info)"    
+
     local prompt_color=$W
-    if [[ $USERNAME != $LOGNAME || $UID = 0 ]]; then
-        user="${(%):-"%n:"}"
-        if [[ $UID = 0 ]]; then 
-            user="%{$Y%}$user"
-        fi
-    fi
+    
     if [[ $UID -eq 0 ]]; then
         prompt_color=$Y
     fi
+
     local time="${(%):-%*}"
-    local ssh=
+
     if [[ $SSH_CLIENT != "" ]]; then
         ssh="$(echo "$SSH_CLIENT" | cut -f 1)"
     fi
@@ -109,11 +90,10 @@ function build_prompt() {
     local git="$(git_prompt_info)"
 
     l="%B$dir%b $git"
-    r="$ssh$time"
+    r=" $ssh$time :"
     c="$(column "$l" "$r")"
-    echo -e "$R%(?..-> %? <-\n)$RESET"
-    echo -e "$C$l$K$c$r$RESET$prompt_color"
-    echo "> "
+
+    echo -e "$R%(?..-> %? <-\n)$RESET\n$C$l$K$c$r$RESET$prompt_color\n> "
 }
 #reset the color before the execute
 function preexec {
