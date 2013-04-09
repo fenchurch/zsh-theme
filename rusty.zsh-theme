@@ -33,7 +33,7 @@ function user_prompt_info {
 }
 
 function ssh_prompt_info {
-    [ "$SSH_CLIENT" != "" ] && echo -n "${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1)${2:-"]"}";
+    [ "$SSH_CLIENT" != "" ] && echo "${(%):-%m} ${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1 -d " ")${2:-"]"}";
 }
 
 function git_prompt_info {
@@ -41,7 +41,7 @@ function git_prompt_info {
    echo "$(parse_git_dirty)$ZSH_THEME_GIT_PROMPT_PREFIX$(current_branch)$ZSH_THEME_GIT_PROMPT_SUFFIX "
 }
 function length {
-    #clear the formatting
+   #clear the formatting
     local cl='%([BSUbfksu]|([FB]|){*})'
     #find string length unformatted
     echo ${#:-${(S%%)1//$~cl}}
@@ -67,18 +67,16 @@ function shorten {
 }
 function build_prompt() {
     local dir="${(%):-%~}"
-    local host="${:-$(hostname)%%.*}"
+    local host="${(%):-%m}"
     local time="${(%):-%*}"    
     local user="$(user_prompt_info)"
-    local ssh="$(ssh_prompt_info)"    
     local git="$(git_prompt_info)"
     [ ! -z $UID ] && prompt_color=$W || prompt_color=$Y
-
     l="%B$dir%b $git"
-    r=" $ssh$time"
+    r=" $ssh$time "
     c="$(column "$l" "$r")"
 
-    echo -e "$R%(?..-> %? <-\n)$RESET\n$C$l$K$c$r$RESET$prompt_color\n> "
+    echo -e "$R%(?..-> %? <-\n)$RESET\n$C$l$K$c$r$prompt_color\n> "
 }
 #reset the color before the execute
 function preexec {
@@ -87,4 +85,4 @@ function preexec {
 
 PS1='$( build_prompt )'
 PS2='%_-> '
-RPROMPT=
+RPROMPT='%{$K%}$(ssh_prompt_info)%{$RESET%}'
