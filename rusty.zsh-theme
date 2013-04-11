@@ -1,5 +1,5 @@
 #remove previous rprompt
-#setopt transient_rprompt
+setopt transient_rprompt
 # Color shortcuts
 R=$fg[red]
 C=$fg[cyan]
@@ -14,6 +14,7 @@ YB=$fg_bold[yellow]
 BB=$fg_bold[blue]
 RESET=$reset_color
 
+
 #git
 ZSH_THEME_GIT_PROMPT_PREFIX="[git:"
 ZSH_THEME_GIT_PROMPT_SUFFIX="]%{$RESET%}"
@@ -22,18 +23,19 @@ ZSH_THEME_GIT_PROMPT_CLEAN="%{$G%}▲ "
 
 function user_prompt_info {
     #if you're on a different user than yours
-    if [[ $USERNAME != $LOGNAME || $UID = 0 ]]; then
-        user="${(%):-"%n:"}"
+    local user="${(%):-"%n"}"
         #if you're on the root, make it yellow
-        if [[ $UID = 0 ]]; then 
-            user="$Y$user"
-        fi
-    fi
-    echo -n "$user"
+    [ "$UID" = "0" ] && user="%{$Y%}$user"
+    [ "$SSH_CLIENT" != "" ] && [ "$UID" = "0" ] && echo -n "%{$W%}$user%{$RESET%}"
 }
 
 function ssh_prompt_info {
-    [ "$SSH_CLIENT" != "" ] && echo "${(%):-%m} ${1:-"["}$(echo "$SSH_CLIENT" | cut -f 1 -d " ")${2:-"]"}";
+    local wrap=
+    wrap[1]=${1:-"["}
+    wrap[2]=${2:-"]"}
+    local ssh="${SSH_CLIENT%% *}"
+    [[ ! $ssh =~ "[A-Z0-9]{4}\:/" ]] && ssh="$(curl -s http://icanhazip.com)"
+    [[ $ssh != "" ]] && echo -n "${wrap[1]}$ssh${wrap[2]}"
 }
 
 function git_prompt_info {
@@ -43,8 +45,10 @@ function git_prompt_info {
 function length {
    #clear the formatting
     local cl='%([BSUbfksu]|([FB]|){*})'
+    local str="${1}"
+    #local str="$(print -Pr "$1")"
     #find string length unformatted
-    echo ${#:-${(S%%)1//$~cl}}
+    echo "${#:-${(S%%)str//$~cl}}"
 }
 
 function column {
@@ -54,9 +58,9 @@ function column {
 }
 function shorten {
     #arg 3 or term width
+    local offset=$(length ${2:-"0"})
     local max=${3:-$(tput cols)}
     #arg 2 or nothing
-    local offset=$(length ${2:-""})
     #what to shorten with
     local fill=${4:-".."}
     #filter it %max<placeholder<original%<<
@@ -66,23 +70,37 @@ function shorten {
     echo -n "$filtered"
 }
 function build_prompt() {
-    local dir="${(%):-%~}"
     local host="${(%):-%m}"
-    local time="${(%):-%*}"    
+    local time="${(%):-%*}"
     local user="$(user_prompt_info)"
     local git="$(git_prompt_info)"
-    [ ! -z $UID ] && prompt_color=$W || prompt_color=$Y
-    l="%B$dir%b $git"
-    r=" $ssh$time "
-    c="$(column "$l" "$r")"
+    local err="%{$R%}%(?..-> %? <-\n)%{$RESET%}"
+    local dir="$(shorten "${(%):-%~}" "$git  $time " )"
+    local pr_left="$dir $git"
+    local pr_right=" $time "
+    local pr_center="$(column "$pr_left" "$pr_right")"
 
-    echo -e "$R%(?..-> %? <-\n)$RESET\n$C$l$K$c$r$prompt_color\n> "
+    echo -e "$err"
+    echo -en "$C$pr_left"
+    echo -en "$K$pr_center"
+    echo -en "$pr_right"
+    echo -en "$prompt_arrow "
 }
 #reset the color before the execute
 function preexec {
     print -Pr "$RESET"
 }
 
+if [[ $UID != 0 ]]; then
+    prompt_arrow="$W\n>"
+else
+    prompt_arrow="$Y\n→"
+    RPROMPT=%{$Y%}root
+fi
+if [[ $SSH_CLIENT != "" ]]; then
+    RPROMPT=${RPROMPT:-%n}%{$RESET%}@%{$M%}%m%{$RESET%}$(ssh_prompt_info);
+fi
+RPROMPT+="%{$RESET%}"
+
 PS1='$( build_prompt )'
 PS2='%_-> '
-RPROMPT='%{$K%}$(ssh_prompt_info)%{$RESET%}'
