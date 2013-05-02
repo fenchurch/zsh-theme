@@ -1,5 +1,6 @@
 #remove previous rprompt
 setopt transient_rprompt
+
 # Color shortcuts
 R="%{${fg[red]}%}"
 C="%{${fg[cyan]}%}"
@@ -9,9 +10,9 @@ W="%{${fg[white]}%}"
 Y="%{${fg[yellow]}%}"
 B="%{${fg[blue]}%}"
 K="%{${fg[black]}%}"
-
 RE="%{$reset_color%}"
 
+#timefmt
 TIMEFMT="12hour"
 
 #git
@@ -21,12 +22,12 @@ ZSH_THEME_GIT_PROMPT_DIRTY="$R▼ "
 ZSH_THEME_GIT_PROMPT_CLEAN="$G▲ $K"
 
 ARROW=">"
+ROOT_ARROW=">"
 
 function time_prompt_info {
-    local time="${(%):-%*}"
-    #time
-    [[ $TIMEFMT = "12hour" ]] && time="$((${time%%:*} % 12)):${time#*:}"
-    echo -en $time 
+    local t="${(%):-%*}"
+    [[ $TIMEFMT = "12hour" ]] && t="${$((${t%%:*} % 12))/0/12}:${t#*:}"
+    echo -en $t 
 }
 
 function user_prompt_info {
@@ -42,10 +43,9 @@ function ssh_prompt_info {
     local locale="local"
     #if we are running ssh
     [[ -z $ssh ]] || (
-    #test if we have the ping6 function
-    #assumes that ip6's are from btmm vpn.
-        test ping6 > /dev/null 2>&1 && \
-        ping6 -o $ssh > /dev/null 2>&1 && \
+        #if ipv4 assume local
+        #otherwise find the external
+        [[ $ssh =~ "([0-9]{1,3}\.){3}[0-9]{1,3}" ]] ||\
         ssh="$( curl -s http://icanhazip.com )" && \
         locale="iCloud"
         echo ".$locale ${1:-(} $ssh ${2:-)}"
@@ -57,16 +57,18 @@ function git_prompt_info {
    echo "$(parse_git_dirty)$ZSH_THEME_GIT_PROMPT_PREFIX$(current_branch)$ZSH_THEME_GIT_PROMPT_SUFFIX "
 }
 function perms_prompt_info {
+
     dir="${(%)1:-%d}"
-    perms=${$(stat "$dir")[3]}
+    perms=$(IFS=\ ;echo ${$(stat "$dir")[3]})
     #if user is owner, show permissions
     [[ -O $dir ]] && perm="u(${perms:1:3})" || \
     #if user is in the group, show permissions
     for g in $( id -G $EUID ); do
-        [[ ${$(stat -r "$dir")[6]} == $g ]] && perm="g(${perms:4:3})"
+        [[ $(IFS=\ ;echo ${$(stat -r "$dir")[6]}) == $g ]] && perm="g(${perms:4:3})"
     done
     #if perm is empty, give the "others" permissions
     echo ${perm:-"o(${perms:7:3})"}
+    IFS=$oIFS
 }
 
 function length {
@@ -107,7 +109,7 @@ function build_prompt() {
     local pr_center="$(column "${pr_left}${pr_right}" )"
     
     arrow="$W\n$ARROW"
-    [[ $UID -eq 0 ]] && arrow="$Y\n→"; 
+    [[ $UID -eq 0 ]] && arrow="$Y\n$ROOT_ARROW"; 
     
 
     echo -e "$err"
@@ -131,5 +133,4 @@ function preexec {
 
 PS1='$( build_prompt )'
 PS2='%_${ARROW} ' 
-
 RPROMPT='$( build_rprompt )'
